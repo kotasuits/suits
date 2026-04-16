@@ -1,8 +1,245 @@
 document.addEventListener('DOMContentLoaded', () => {
     const productGrid = document.getElementById('product-grid');
-    const filterBtns = document.querySelectorAll('.filter-btn');
+    const MAX_FAV = 10;
 
-    // ─── Lightbox ────────────────────────────────────────────────────
+    // ════════════════════════════════════════════
+    //  FAVOURITES STATE
+    // ════════════════════════════════════════════
+    // Each item: { id, title, category, price, image }
+    let favourites = JSON.parse(localStorage.getItem('kd_favourites') || '[]');
+
+    function saveFavs() {
+        localStorage.setItem('kd_favourites', JSON.stringify(favourites));
+    }
+    function isFaved(id) { return favourites.some(f => f.id === id); }
+
+    function toggleFav(product, images) {
+        const idx = favourites.findIndex(f => f.id === product.id);
+        if (idx >= 0) {
+            favourites.splice(idx, 1);
+        } else {
+            if (favourites.length >= MAX_FAV) {
+                showToast('⚠️ You can select up to 10 designs. Remove one first.');
+                return false;
+            }
+            favourites.push({
+                id:       product.id,
+                title:    product.title,
+                category: product.category,
+                price:    product.price,
+                image:    images[0] || ''
+            });
+        }
+        saveFavs();
+        refreshFavUI();
+        // Auto-open drawer after first fav
+        if (favourites.length === 1) openDrawer();
+        // Auto-trigger order modal at 10
+        if (favourites.length === MAX_FAV) {
+            setTimeout(() => openOrderModal(), 400);
+        }
+        return true;
+    }
+
+    // refresh every heart button on the page
+    function refreshHeartButtons() {
+        document.querySelectorAll('.heart-btn').forEach(btn => {
+            const id = btn.dataset.id;
+            const faved = isFaved(id);
+            btn.classList.toggle('faved', faved);
+            btn.querySelector('.hic').textContent = faved ? '❤️' : '🤍';
+            btn.setAttribute('aria-label', faved ? 'Remove from favourites' : 'Add to favourites');
+        });
+        document.querySelectorAll('.product-card').forEach(card => {
+            card.classList.toggle('faved-card', isFaved(card.dataset.id));
+        });
+    }
+
+    // ════════════════════════════════════════════
+    //  NAV COUNTER
+    // ════════════════════════════════════════════
+    const favCounter = document.getElementById('fav-counter');
+    function updateCounter() {
+        const n = favourites.length;
+        favCounter.textContent = n;
+        favCounter.classList.toggle('visible', n > 0);
+    }
+
+    // ════════════════════════════════════════════
+    //  DRAWER
+    // ════════════════════════════════════════════
+    const favOverlay = document.getElementById('fav-overlay');
+    const favDrawer  = document.getElementById('fav-drawer');
+    const drawerBody = document.getElementById('drawer-body');
+    const drawerCountEl = document.getElementById('drawer-count');
+    const progFill   = document.getElementById('fav-prog-fill');
+    const progCount  = document.getElementById('prog-count');
+    const progText   = document.getElementById('prog-text');
+    const btnOrder   = document.getElementById('btn-place-order');
+
+    function openDrawer()  { favOverlay.classList.add('open'); favDrawer.classList.add('open'); }
+    function closeDrawer() { favOverlay.classList.remove('open'); favDrawer.classList.remove('open'); }
+
+    document.getElementById('fav-nav-btn').onclick = openDrawer;
+    document.getElementById('drawer-close').onclick = closeDrawer;
+    favOverlay.onclick = closeDrawer;
+
+    function renderDrawer() {
+        drawerCountEl.textContent = favourites.length;
+        const pct = Math.min(100, (favourites.length / MAX_FAV) * 100);
+        progFill.style.width  = pct + '%';
+        progCount.textContent = `${favourites.length} / ${MAX_FAV}`;
+
+        if (favourites.length === 0) {
+            progText.innerHTML = `Select <b>${MAX_FAV}</b> designs to enquire`;
+            drawerBody.innerHTML = `<div class="drawer-empty"><div class="de-ico">💔</div><p>No favourites yet.<br>Tap the ❤️ on any design!</p></div>`;
+            btnOrder.disabled = true;
+            btnOrder.textContent = `📋 Send Enquiry (select 10 designs)`;
+            return;
+        }
+
+        const remaining = MAX_FAV - favourites.length;
+        if (remaining > 0) {
+            progText.innerHTML = `Select <b>${remaining} more</b> design${remaining !== 1 ? 's' : ''} to enquire`;
+        } else {
+            progText.innerHTML = `✅ Ready! Submit your enquiry`;
+        }
+        btnOrder.disabled    = favourites.length < MAX_FAV;
+        btnOrder.textContent = favourites.length >= MAX_FAV
+            ? `📋 Send Enquiry (${MAX_FAV} designs ready!)`
+            : `📋 Send Enquiry (${favourites.length}/${MAX_FAV} selected)`;
+
+        drawerBody.innerHTML = '';
+        favourites.forEach((item, i) => {
+            const row = document.createElement('div');
+            row.className = 'fav-item';
+            row.innerHTML = `
+                <img class="fav-thumb" src="${item.image}" alt="${item.title}">
+                <div class="fav-info">
+                    <div class="fav-name">${item.title}</div>
+                    <div class="fav-cat">${(item.category || '').replace(/-/g,' ')}</div>
+                    <div class="fav-price">₹${Number(item.price).toLocaleString('en-IN')}</div>
+                </div>
+                <button class="fav-remove" title="Remove" data-i="${i}">✕</button>`;
+            row.querySelector('.fav-remove').onclick = () => {
+                favourites.splice(i, 1);
+                saveFavs();
+                refreshFavUI();
+            };
+            drawerBody.appendChild(row);
+        });
+    }
+
+    function refreshFavUI() {
+        updateCounter();
+        renderDrawer();
+        refreshHeartButtons();
+    }
+
+    document.getElementById('btn-clear-favs').onclick = () => {
+        if (!favourites.length) return;
+        if (confirm('Clear all favourites?')) {
+            favourites = []; saveFavs(); refreshFavUI();
+        }
+    };
+
+    btnOrder.onclick = openOrderModal;
+
+    // ════════════════════════════════════════════
+    //  ORDER MODAL
+    // ════════════════════════════════════════════
+    const orderOverlay = document.getElementById('order-overlay');
+    const omSummary    = document.getElementById('om-summary');
+    const omName       = document.getElementById('om-name');
+    const omPhone      = document.getElementById('om-phone');
+
+    function openOrderModal() {
+        omName.value  = '';
+        omPhone.value = '';
+        omSummary.innerHTML = favourites.map(f =>
+            `<div class="om-summary-item">${f.title} — ₹${Number(f.price).toLocaleString('en-IN')}</div>`
+        ).join('');
+        orderOverlay.classList.add('open');
+    }
+    function closeOrderModal() { orderOverlay.classList.remove('open'); }
+
+    document.getElementById('om-cancel').onclick = closeOrderModal;
+    orderOverlay.addEventListener('click', e => { if (e.target === orderOverlay) closeOrderModal(); });
+
+    document.getElementById('om-submit').onclick = async () => {
+        const name  = omName.value.trim();
+        const phone = omPhone.value.trim();
+        if (!name)  { omName.focus();  shakeInput(omName);  return; }
+        if (!phone) { omPhone.focus(); shakeInput(omPhone); return; }
+        if (!/^[\d\s+\-]{7,15}$/.test(phone)) { shakeInput(omPhone); omPhone.placeholder = 'Enter valid number'; return; }
+
+        const order = {
+            id:        'ORD-' + Date.now(),
+            name,
+            phone,
+            designs:   [...favourites],
+            total:     favourites.reduce((s, f) => s + Number(f.price), 0),
+            status:    'new',
+            createdAt: new Date().toISOString()
+        };
+
+        // Save to localStorage (orders list for admin panel)
+        const orders = JSON.parse(localStorage.getItem('kd_orders') || '[]');
+        orders.unshift(order);
+        localStorage.setItem('kd_orders', JSON.stringify(orders));
+
+        // Also try saving to server/GitHub if available
+        try {
+            const mode    = localStorage.getItem('admin_mode');
+            const ghToken = localStorage.getItem('gh_token');
+            const ghRepo  = localStorage.getItem('gh_repo');
+            if (mode === 'github' && ghToken && ghRepo) {
+                await saveOrderToGitHub(order, ghToken, ghRepo);
+            } else if (mode === 'server') {
+                await fetch('api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(order) }).catch(() => {});
+            }
+        } catch(_) { /* silently ignore — localStorage always works */ }
+
+        closeOrderModal();
+        closeDrawer();
+        favourites = []; saveFavs(); refreshFavUI();
+        showToast('✅ Enquiry sent! We\'ll contact you on WhatsApp shortly. 🎉');
+    };
+
+    function shakeInput(el) {
+        el.style.borderColor = '#e11d48';
+        el.animate([{transform:'translateX(-5px)'},{transform:'translateX(5px)'},{transform:'translateX(-3px)'},{transform:'translateX(0)'}], {duration:300});
+        setTimeout(() => el.style.borderColor = '', 1500);
+    }
+
+    async function saveOrderToGitHub(order, ghToken, ghRepo) {
+        // Append to orders.json in the GitHub repo
+        const url = `https://api.github.com/repos/${ghRepo}/contents/orders.json`;
+        const headers = { 'Authorization': `token ${ghToken}`, 'Accept': 'application/vnd.github.v3+json' };
+        let existing = [], sha = null;
+        try {
+            const r = await fetch(url + '?t=' + Date.now(), { headers });
+            if (r.ok) { const d = await r.json(); sha = d.sha; existing = JSON.parse(decodeURIComponent(escape(atob(d.content.replace(/\s/g, ''))))); }
+        } catch(_) {}
+        existing.unshift(order);
+        const body = { message: `New order: ${order.name}`, content: btoa(unescape(encodeURIComponent(JSON.stringify(existing, null, 2)))) };
+        if (sha) body.sha = sha;
+        await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+    }
+
+    // ════════════════════════════════════════════
+    //  TOAST
+    // ════════════════════════════════════════════
+    function showToast(msg) {
+        const t = document.getElementById('success-toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 4000);
+    }
+
+    // ════════════════════════════════════════════
+    //  LIGHTBOX
+    // ════════════════════════════════════════════
     const lightbox = document.createElement('div');
     lightbox.className = 'lightbox-overlay';
     lightbox.innerHTML = `
@@ -13,285 +250,181 @@ document.addEventListener('DOMContentLoaded', () => {
         <img class="lightbox-img" src="" alt="Preview">
         <button class="lightbox-arrow lightbox-next" aria-label="Next">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 18l6-6-6-6"/></svg>
-        </button>
-    `;
+        </button>`;
     document.body.appendChild(lightbox);
-
-    const lbImg = lightbox.querySelector('.lightbox-img');
+    const lbImg  = lightbox.querySelector('.lightbox-img');
     const lbPrev = lightbox.querySelector('.lightbox-prev');
     const lbNext = lightbox.querySelector('.lightbox-next');
+    let lbImages = [], lbIdx = 0;
 
-    let lbImages = [];
-    let lbCurrentIdx = 0;
-
-    const updateLightboxImage = () => {
-        lbImg.src = lbImages[lbCurrentIdx];
-        if (lbImages.length > 1) {
-            lbPrev.style.display = 'flex';
-            lbNext.style.display = 'flex';
-        } else {
-            lbPrev.style.display = 'none';
-            lbNext.style.display = 'none';
-        }
+    const updateLB = () => {
+        lbImg.src = lbImages[lbIdx];
+        lbPrev.style.display = lbImages.length > 1 ? 'flex' : 'none';
+        lbNext.style.display = lbImages.length > 1 ? 'flex' : 'none';
     };
-
-    const openLightbox = (images, index) => {
-        lbImages = Array.isArray(images) ? images : [images];
-        lbCurrentIdx = index || 0;
-        updateLightboxImage();
-        lightbox.classList.add('open');
-    };
-
-    lbPrev.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (lbImages.length <= 1) return;
-        lbCurrentIdx = (lbCurrentIdx - 1 + lbImages.length) % lbImages.length;
-        updateLightboxImage();
-    });
-
-    lbNext.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (lbImages.length <= 1) return;
-        lbCurrentIdx = (lbCurrentIdx + 1) % lbImages.length;
-        updateLightboxImage();
-    });
-
-    lightbox.addEventListener('click', (e) => {
-        if (e.target === lightbox || e.target.classList.contains('lightbox-close')) {
-            lightbox.classList.remove('open');
-        }
-    });
-
-    document.addEventListener('keydown', (e) => {
+    const openLB = (imgs, idx) => { lbImages = Array.isArray(imgs) ? imgs : [imgs]; lbIdx = idx || 0; updateLB(); lightbox.classList.add('open'); };
+    lbPrev.onclick = e => { e.stopPropagation(); lbIdx = (lbIdx - 1 + lbImages.length) % lbImages.length; updateLB(); };
+    lbNext.onclick = e => { e.stopPropagation(); lbIdx = (lbIdx + 1) % lbImages.length; updateLB(); };
+    lightbox.onclick = e => { if (e.target === lightbox || e.target.classList.contains('lightbox-close')) lightbox.classList.remove('open'); };
+    document.addEventListener('keydown', e => {
         if (!lightbox.classList.contains('open')) return;
         if (e.key === 'Escape') lightbox.classList.remove('open');
         if (e.key === 'ArrowLeft') lbPrev.click();
         if (e.key === 'ArrowRight') lbNext.click();
     });
 
-    // ─── Pagination Logic ──────────────────────────────────────────
-    let allProducts = [];
-    let filteredProducts = [];
-    let currentPage = 0;
-    const BATCH_SIZE = 12;
+    // ════════════════════════════════════════════
+    //  PRODUCT RENDERING
+    // ════════════════════════════════════════════
+    let allProducts = [], filteredProducts = [], currentPage = 0;
+    const BATCH = 12;
 
-    const showSkeletons = (count = 6) => {
-        productGrid.innerHTML = Array(count).fill(0).map(() => `
+    const showSkeletons = (n = 6) => {
+        productGrid.innerHTML = Array(n).fill(0).map(() => `
             <div class="skeleton-card">
                 <div class="skeleton-img skeleton"></div>
                 <div class="skeleton-text skeleton"></div>
                 <div class="skeleton-desc skeleton"></div>
                 <div class="skeleton-price skeleton"></div>
-            </div>
-        `).join('');
+            </div>`).join('');
     };
 
-    // ─── Render Batch ─────────────────────────────────────────────────
     const loadNextBatch = () => {
-        const start = currentPage * BATCH_SIZE;
-        const end = start + BATCH_SIZE;
+        const start = currentPage * BATCH, end = start + BATCH;
         const batch = filteredProducts.slice(start, end);
-
-        if (batch.length > 0) {
-            displayProducts(batch, currentPage === 0);
-            currentPage++;
-        }
-
-        // Hide observer if no more products
-        if (end >= filteredProducts.length) {
-            sentinel.style.display = 'none';
-        } else {
-            sentinel.style.display = 'block';
-        }
+        if (batch.length) { displayProducts(batch, currentPage === 0); currentPage++; }
+        sentinel.style.display = end >= filteredProducts.length ? 'none' : 'block';
     };
 
-    // ─── Fetch ────────────────────────────────────────────────────────
     const fetchProducts = async () => {
         try {
-            const cacheBust = '?t=' + Date.now();
-            const res = await fetch('api/products' + cacheBust).catch(() => fetch('data.json' + cacheBust));
-            if (!res.ok && res.url.includes('api')) return fetch('data.json' + cacheBust).then(r => r.json());
+            const cb = '?t=' + Date.now();
+            const res = await fetch('api/products' + cb).catch(() => fetch('data.json' + cb));
+            if (!res.ok && res.url.includes('api')) return fetch('data.json' + cb).then(r => r.json());
             return await res.json();
-        } catch (err) {
-            console.error('Fetch error:', err);
-            productGrid.innerHTML = '<p style="color:#6b6b6b;grid-column:1/-1;text-align:center;padding:3rem 0;">Failed to load products. Check console for details.</p>';
-            return [];
-        }
+        } catch { productGrid.innerHTML = '<p style="color:#6b6b6b;grid-column:1/-1;text-align:center;padding:3rem">Failed to load products.</p>'; return []; }
     };
 
-    // ─── Render Cards ─────────────────────────────────────────────────
+    const dlIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>`;
+
     const displayProducts = (items, clear = false) => {
         if (clear) productGrid.innerHTML = '';
+        if (!items.length && clear) { productGrid.innerHTML = '<p style="color:#6b6b6b;grid-column:1/-1;text-align:center;padding:3rem">No products found.</p>'; return; }
 
-        if (items.length === 0 && clear) {
-            productGrid.innerHTML = '<p style="color:#6b6b6b;grid-column:1/-1;text-align:center;padding:3rem 0;">No products found.</p>';
-            return;
-        }
-
-        const downloadIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>`;
-
-        items.forEach((product, idx) => {
-            const images = (product.images && product.images.length > 0) ? product.images : (product.image ? [product.image] : []);
+        items.forEach(product => {
+            const images  = (product.images?.length) ? product.images : (product.image ? [product.image] : []);
             const hasMany = images.length > 1;
-            const formatCat = (c) => c ? c.replace(/-/g, ' ') : '';
-            const thumbsHtml = hasMany ? images.map((src, i) => `<img src="${src}" alt="View ${i + 1}" class="thumb-img${i === 0 ? ' active' : ''}" data-index="${i}" loading="lazy">`).join('') : '';
-
-            const slideArrowsHtml = hasMany ? `
-                <button class="slide-arrow prev-arrow" aria-label="Previous image">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 18l-6-6 6-6"/></svg>
-                </button>
-                <button class="slide-arrow next-arrow" aria-label="Next image">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 18l6-6-6-6"/></svg>
-                </button>
-            ` : '';
+            const fc      = c => (c || '').replace(/-/g,' ');
+            const thumbs  = hasMany ? images.map((s,i) => `<img src="${s}" class="thumb-img${i===0?' active':''}" data-index="${i}" loading="lazy">`).join('') : '';
+            const arrows  = hasMany ? `
+                <button class="slide-arrow prev-arrow" aria-label="Prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 18l-6-6 6-6"/></svg></button>
+                <button class="slide-arrow next-arrow" aria-label="Next"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 18l6-6-6-6"/></svg></button>` : '';
 
             const card = document.createElement('div');
             card.className = 'product-card card-animate';
+            card.dataset.id = product.id;
+            if (isFaved(product.id)) card.classList.add('faved-card');
+
             card.innerHTML = `
                 <div class="card-img-wrapper">
-                    <img src="${images[0] || ''}" alt="${product.title}" class="main-img" loading="lazy">
-                    <span class="card-category-badge">${formatCat(product.category)}</span>
+                    <img src="${images[0]||''}" alt="${product.title}" class="main-img" loading="lazy">
+                    <span class="card-category-badge">${fc(product.category)}</span>
                     ${images.length > 1 ? `<span class="img-count-badge">1 / ${images.length}</span>` : ''}
-                    ${slideArrowsHtml}
+                    <button class="heart-btn${isFaved(product.id)?' faved':''}" data-id="${product.id}" aria-label="${isFaved(product.id)?'Remove from':'Add to'} favourites">
+                        <span class="hic">${isFaved(product.id)?'❤️':'🤍'}</span>
+                    </button>
+                    ${arrows}
                 </div>
-                ${hasMany ? `<div class="thumbnail-strip">${thumbsHtml}</div>` : ''}
+                ${hasMany ? `<div class="thumbnail-strip">${thumbs}</div>` : ''}
                 <div class="card-content">
-                    <p class="card-category-label">${formatCat(product.category)}</p>
+                    <p class="card-category-label">${fc(product.category)}</p>
                     <h3 class="card-title">${product.title}</h3>
-                    <p class="card-desc">${product.description || ''}</p>
+                    <p class="card-desc">${product.description||''}</p>
                     <div class="card-footer">
                         <span class="card-price"><sup>₹</sup>${Number(product.price).toLocaleString('en-IN')}</span>
-                        <button class="save-btn" title="Download Current Image">${downloadIcon} Save Image</button>
+                        <button class="save-btn" title="Download">${dlIcon} Save</button>
                     </div>
-                </div>
-            `;
+                </div>`;
 
-            const mainImg = card.querySelector('.main-img');
+            // Heart button
+            const heartBtn = card.querySelector('.heart-btn');
+            heartBtn.onclick = e => {
+                e.stopPropagation();
+                heartBtn.querySelector('.hic').classList.toggle('faved', !isFaved(product.id));
+                toggleFav(product, images);
+            };
+
+            // Image sliding
+            const mainImg   = card.querySelector('.main-img');
             const countBadge = card.querySelector('.img-count-badge');
-            let currentIdx = 0;
-
+            let curIdx = 0;
             if (hasMany) {
-                const thumbs = card.querySelectorAll('.thumb-img');
-                const prevBtn = card.querySelector('.prev-arrow');
-                const nextBtn = card.querySelector('.next-arrow');
-
-                const updateImage = (index) => {
-                    thumbs[currentIdx].classList.remove('active');
-                    currentIdx = index;
-                    mainImg.src = images[currentIdx];
-                    thumbs[currentIdx].classList.add('active');
-                    if (countBadge) countBadge.textContent = `${currentIdx + 1} / ${images.length}`;
-                };
-
-                thumbs.forEach(thumb => {
-                    thumb.onclick = (e) => {
-                        updateImage(parseInt(e.currentTarget.dataset.index));
-                    };
-                });
-
-                if (prevBtn && nextBtn) {
-                    prevBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        let newIdx = currentIdx - 1;
-                        if (newIdx < 0) newIdx = images.length - 1;
-                        updateImage(newIdx);
-                    };
-                    nextBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        let newIdx = currentIdx + 1;
-                        if (newIdx >= images.length) newIdx = 0;
-                        updateImage(newIdx);
-                    };
-                }
+                const tList = card.querySelectorAll('.thumb-img');
+                const prev  = card.querySelector('.prev-arrow');
+                const next  = card.querySelector('.next-arrow');
+                const go    = idx => { tList[curIdx].classList.remove('active'); curIdx = idx; mainImg.src = images[curIdx]; tList[curIdx].classList.add('active'); if (countBadge) countBadge.textContent = `${curIdx+1} / ${images.length}`; };
+                tList.forEach(t => { t.onclick = e => go(+e.currentTarget.dataset.index); });
+                if (prev) prev.onclick = e => { e.stopPropagation(); go((curIdx-1+images.length)%images.length); };
+                if (next) next.onclick = e => { e.stopPropagation(); go((curIdx+1)%images.length); };
             }
 
-            mainImg.onclick = () => openLightbox(images, currentIdx);
-            const saveBtn = card.querySelector('.save-btn');
-            saveBtn.onclick = async (e) => {
+            // Lightbox on image click
+            mainImg.onclick = () => openLB(images, curIdx);
+
+            // Save/download
+            card.querySelector('.save-btn').onclick = async e => {
                 e.preventDefault();
-                const originalHtml = saveBtn.innerHTML;
-                saveBtn.innerHTML = 'Downloading…';
-                saveBtn.disabled = true;
-
+                const btn = e.currentTarget;
+                const orig = btn.innerHTML; btn.innerHTML = 'Saving…'; btn.disabled = true;
                 try {
-                    const img = new Image();
-                    img.crossOrigin = 'Anonymous';
-                    img.src = mainImg.src;
-                    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
-
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width; canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0);
-
-                    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
-                    const filename = `${product.title.replace(/\s+/g, '_').toLowerCase()}_${currentIdx + 1}.jpg`;
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob); a.download = filename; a.click();
-                } catch (err) {
-                    alert('Error downloading image.');
-                } finally {
-                    saveBtn.innerHTML = originalHtml; saveBtn.disabled = false;
-                }
+                    const img = new Image(); img.crossOrigin = 'Anonymous'; img.src = mainImg.src;
+                    await new Promise((r,j) => { img.onload=r; img.onerror=j; });
+                    const cv = document.createElement('canvas'); cv.width=img.width; cv.height=img.height;
+                    const ctx = cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); ctx.drawImage(img,0,0);
+                    const blob = await new Promise(r => cv.toBlob(r,'image/jpeg',0.95));
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${product.title.replace(/\s+/g,'_')}_${curIdx+1}.jpg`; a.click();
+                } catch { alert('Download error.'); }
+                finally { btn.innerHTML=orig; btn.disabled=false; }
             };
+
             productGrid.appendChild(card);
         });
     };
 
-    // ─── Observer & Sentinel ──────────────────────────────────────────
+    // Sentinel / infinite scroll
     const sentinel = document.createElement('div');
-    sentinel.id = 'pagination-sentinel';
-    sentinel.style.height = '20px';
-    sentinel.style.width = '100%';
+    sentinel.id = 'pagination-sentinel'; sentinel.style.cssText = 'height:20px;width:100%';
     document.querySelector('.catalog-section').appendChild(sentinel);
-
-    const observer = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && filteredProducts.length > 0) {
-            loadNextBatch();
-        }
-    }, { rootMargin: '200px' });
-
+    const observer = new IntersectionObserver(es => { if (es[0].isIntersecting && filteredProducts.length) loadNextBatch(); }, { rootMargin:'200px' });
     observer.observe(sentinel);
 
-    // ─── Init ──────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════
+    //  CATEGORIES + INIT
+    // ════════════════════════════════════════════
     const fetchCategories = async () => {
         try {
-            const cacheBust = '?t=' + Date.now();
-            const res = await fetch('api/categories' + cacheBust).catch(() => fetch('categories.json' + cacheBust));
-            if (!res.ok && res.url.includes('api')) return fetch('categories.json' + cacheBust).then(r => r.json());
+            const cb = '?t=' + Date.now();
+            const res = await fetch('api/categories'+cb).catch(() => fetch('categories.json'+cb));
+            if (!res.ok && res.url.includes('api')) return fetch('categories.json'+cb).then(r=>r.json());
             return await res.json();
-        } catch (err) {
-            return ["embroidery", "block-print", "brush-paint", "screen-print"];
-        }
-    };
-
-    const initCategories = (categories) => {
-        const categorySelect = document.getElementById('category-filter');
-        if (categorySelect) {
-            categorySelect.innerHTML = '<option value="all">All Designs</option>' + categories.map(cat => `<option value="${cat}">${cat.charAt(0).toUpperCase() + cat.slice(1).replace('-', ' ')}</option>`).join('');
-        }
+        } catch { return ['embroidery','block-print','brush-paint','screen-print']; }
     };
 
     const initApp = async () => {
         showSkeletons(12);
-        const [products, categories] = await Promise.all([fetchProducts(), fetchCategories()]);
-        allProducts = products;
-        filteredProducts = products;
-        initCategories(categories);
+        const [products, cats] = await Promise.all([fetchProducts(), fetchCategories()]);
+        allProducts = products; filteredProducts = products;
 
-        const categorySelect = document.getElementById('category-filter');
-        if (categorySelect) {
-            categorySelect.onchange = (e) => {
-                const filter = e.target.value;
-                filteredProducts = filter === 'all' ? allProducts : allProducts.filter(p => p.category === filter);
-                currentPage = 0;
-                productGrid.innerHTML = '';
-                loadNextBatch();
-            };
-        }
+        const catSel = document.getElementById('category-filter');
+        catSel.innerHTML = '<option value="all">All Designs</option>' + cats.map(c => `<option value="${c}">${c.charAt(0).toUpperCase()+c.slice(1).replace('-',' ')}</option>`).join('');
+        catSel.onchange = e => {
+            const f = e.target.value;
+            filteredProducts = f === 'all' ? allProducts : allProducts.filter(p => p.category === f);
+            currentPage = 0; productGrid.innerHTML = ''; loadNextBatch();
+        };
 
         loadNextBatch();
+        refreshFavUI();
     };
 
     initApp();
