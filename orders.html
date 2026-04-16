@@ -188,50 +188,138 @@
         @keyframes slu { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
 
         /* ── Designs grid (clickable) ── */
-        .designs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:0.65rem; margin:0.85rem 0; }
+        .designs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:0.75rem; margin:0.85rem 0; }
         .design-chip {
             background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09);
-            border-radius:10px; padding:0.5rem; text-align:center;
+            border-radius:12px; padding:0.6rem; text-align:center;
             cursor:pointer; transition:border-color 0.2s, transform 0.15s;
         }
-        .design-chip:hover { border-color:rgba(251,191,36,0.45); transform:translateY(-2px); }
-        .design-chip img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; margin-bottom:0.35rem; display:block; }
+        .design-chip:hover { border-color:rgba(251,191,36,0.4); transform:translateY(-2px); }
+
+        /* Selected photo (customer's pick) — big, front and centre */
+        .dc-selected-wrap { position:relative; margin-bottom:0.4rem; }
+        .dc-selected-img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; display:block; border:2px solid rgba(251,191,36,0.6); }
+        .dc-pick-badge {
+            position:absolute; top:4px; left:4px;
+            background:rgba(251,191,36,0.9); color:#000;
+            font-size:0.55rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;
+            border-radius:5px; padding:2px 5px; display:flex; align-items:center; gap:2px;
+        }
+
+        /* Other photos mini-strip */
+        .dc-other-strip { display:flex; gap:3px; margin-bottom:0.35rem; justify-content:center; flex-wrap:wrap; }
+        .dc-strip-img { width:28px; height:28px; object-fit:cover; border-radius:4px; border:1.5px solid rgba(255,255,255,0.1); flex-shrink:0; }
+
         .dc-name  { font-size:0.66rem; color:rgba(255,255,255,0.5); line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:0.2rem; }
         .dc-price { font-size:0.72rem; font-weight:700; color:#fbbf24; }
-        .dc-zoom  { font-size:0.6rem; color:rgba(255,255,255,0.25); margin-top:0.15rem; }
+        .dc-zoom  { font-size:0.58rem; color:rgba(255,255,255,0.22); margin-top:0.15rem; }
 
-        /* ── Photo Lightbox (admin view) ── */
+        /* ── Photo Gallery Lightbox ── */
         .photo-lb-overlay {
             display:none; position:fixed; inset:0; z-index:2000;
-            background:rgba(0,0,0,0.9); backdrop-filter:blur(10px);
-            align-items:center; justify-content:center; padding:1rem;
-            animation:fadeIn 0.2s ease;
+            background:rgba(0,0,0,0.92); backdrop-filter:blur(12px);
+            flex-direction:column; align-items:center; justify-content:center;
+            padding:1rem;
         }
-        .photo-lb-overlay.open { display:flex; }
+        .photo-lb-overlay.open { display:flex; animation:fadeIn 0.2s ease; }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-        .photo-lb-inner {
-            position:relative; max-width:640px; width:100%;
-            background:#1a1b26; border:1px solid rgba(255,255,255,0.1);
+
+        .lb-modal {
+            position:relative; width:100%; max-width:680px;
+            background:#1a1b26; border:1px solid rgba(255,255,255,0.08);
             border-radius:20px; overflow:hidden;
             box-shadow:0 32px 80px rgba(0,0,0,0.7);
             animation:scaleIn 0.25s ease;
+            display:flex; flex-direction:column;
         }
-        @keyframes scaleIn { from{transform:scale(0.93);opacity:0} to{transform:scale(1);opacity:1} }
-        .photo-lb-img { width:100%; max-height:65vh; object-fit:contain; display:block; background:#111; }
-        .photo-lb-info {
-            padding:1.1rem 1.25rem;
-            display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;
+        @keyframes scaleIn { from{transform:scale(0.94);opacity:0} to{transform:scale(1);opacity:1} }
+
+        /* Top bar */
+        .lb-topbar {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:0.85rem 1.1rem;
+            border-bottom:1px solid rgba(255,255,255,0.07);
+            flex-shrink:0;
         }
-        .photo-lb-info .lb-title { font-weight:700; font-size:1rem; }
-        .photo-lb-info .lb-cat   { font-size:0.75rem; color:rgba(255,255,255,0.4); margin-top:0.1rem; }
-        .photo-lb-info .lb-price { font-size:1.15rem; font-weight:800; color:#fbbf24; }
-        .photo-lb-close {
-            position:absolute; top:0.75rem; right:0.75rem;
-            background:rgba(0,0,0,0.6); border:none; color:#fff;
-            width:34px; height:34px; border-radius:50%; font-size:1.1rem;
-            cursor:pointer; display:grid; place-items:center; transition:background 0.2s; z-index:10;
+        .lb-topbar-info { line-height:1.3; }
+        .lb-topbar-title { font-weight:700; font-size:0.95rem; }
+        .lb-topbar-meta  { font-size:0.75rem; color:rgba(255,255,255,0.38); margin-top:0.1rem; }
+        .lb-topbar-right { display:flex; align-items:center; gap:0.6rem; }
+        .lb-counter {
+            font-size:0.75rem; font-weight:700;
+            background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1);
+            color:rgba(255,255,255,0.45); padding:0.2rem 0.65rem; border-radius:20px;
         }
-        .photo-lb-close:hover { background:rgba(239,68,68,0.7); }
+        .lb-close-btn {
+            background:rgba(239,68,68,0); border:1px solid rgba(255,255,255,0.1);
+            color:rgba(255,255,255,0.5); width:30px; height:30px;
+            border-radius:50%; cursor:pointer; display:grid; place-items:center;
+            font-size:1rem; transition:all 0.2s;
+        }
+        .lb-close-btn:hover { background:rgba(239,68,68,0.7); border-color:transparent; color:#fff; }
+
+        /* Image area */
+        .lb-img-area {
+            position:relative; background:#0d0d14;
+            display:flex; align-items:center; justify-content:center;
+            min-height:300px; max-height:60vh;
+        }
+        .lb-main-img {
+            width:100%; max-height:60vh;
+            object-fit:contain; display:block;
+            transition:opacity 0.2s;
+        }
+        .lb-main-img.fading { opacity:0; }
+
+        /* Nav arrows */
+        .lb-arrow {
+            position:absolute; top:50%; transform:translateY(-50%);
+            background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.1);
+            color:#fff; width:38px; height:38px; border-radius:50%;
+            cursor:pointer; display:grid; place-items:center;
+            font-size:1.3rem; transition:background 0.2s;
+            z-index:5; line-height:1;
+        }
+        .lb-arrow:hover { background:rgba(0,0,0,0.85); }
+        .lb-arrow.lb-prev { left:0.75rem; }
+        .lb-arrow.lb-next { right:0.75rem; }
+        .lb-arrow:disabled { opacity:0.2; cursor:default; }
+
+        /* Bottom bar: download + price */
+        .lb-bottombar {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:0.85rem 1.1rem; border-top:1px solid rgba(255,255,255,0.07);
+            flex-wrap:wrap; gap:0.6rem; flex-shrink:0;
+        }
+        .lb-price-tag { font-size:1.1rem; font-weight:800; color:#fbbf24; }
+        .lb-dl-btn {
+            display:inline-flex; align-items:center; gap:0.4rem;
+            background:linear-gradient(135deg,#7c3aed,#4f46e5);
+            color:#fff; border:none; border-radius:10px;
+            padding:0.55rem 1.1rem; font-family:inherit; font-size:0.85rem; font-weight:700;
+            cursor:pointer; transition:opacity 0.2s, transform 0.15s;
+            box-shadow:0 4px 14px rgba(124,58,237,0.35);
+        }
+        .lb-dl-btn:hover { opacity:0.88; transform:translateY(-1px); }
+        .lb-dl-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
+        /* Thumbnail strip */
+        .lb-thumbs {
+            display:flex; gap:0.4rem; overflow-x:auto; padding:0.7rem 1.1rem;
+            border-top:1px solid rgba(255,255,255,0.06);
+            background:rgba(0,0,0,0.2); flex-shrink:0;
+            scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.15) transparent;
+        }
+        .lb-thumbs::-webkit-scrollbar { height:4px; }
+        .lb-thumbs::-webkit-scrollbar-track { background:transparent; }
+        .lb-thumbs::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:4px; }
+        .lb-thumb {
+            width:52px; height:52px; border-radius:7px; flex-shrink:0;
+            object-fit:cover; cursor:pointer; border:2px solid transparent;
+            transition:border-color 0.2s, opacity 0.2s; opacity:0.55;
+        }
+        .lb-thumb.active { border-color:#a78bfa; opacity:1; }
+        .lb-thumb:hover   { opacity:0.85; }
 
         @media(max-width:700px){ .stats-row{grid-template-columns:1fr 1fr} .controls{flex-direction:column;align-items:stretch} .oh-date{display:none} }
         @media(max-width:480px){ .stats-row{grid-template-columns:1fr} }
@@ -275,18 +363,40 @@
     </div>
 </div>
 
-<!-- ══ PHOTO LIGHTBOX ══ -->
+<!-- ══ PHOTO GALLERY LIGHTBOX ══ -->
 <div class="photo-lb-overlay" id="photo-lb">
-    <div class="photo-lb-inner">
-        <button class="photo-lb-close" id="photo-lb-close">✕</button>
-        <img class="photo-lb-img" id="photo-lb-img" src="" alt="">
-        <div class="photo-lb-info">
-            <div>
-                <div class="lb-title" id="lb-title"></div>
-                <div class="lb-cat"   id="lb-cat"></div>
+    <div class="lb-modal">
+
+        <!-- Top bar -->
+        <div class="lb-topbar">
+            <div class="lb-topbar-info">
+                <div class="lb-topbar-title" id="lb-title">Product</div>
+                <div class="lb-topbar-meta"  id="lb-cat"></div>
             </div>
-            <div class="lb-price" id="lb-price"></div>
+            <div class="lb-topbar-right">
+                <span class="lb-counter" id="lb-counter">1 / 1</span>
+                <button class="lb-close-btn" id="photo-lb-close">✕</button>
+            </div>
         </div>
+
+        <!-- Image area -->
+        <div class="lb-img-area">
+            <button class="lb-arrow lb-prev" id="lb-prev">‹</button>
+            <img class="lb-main-img" id="lb-main-img" src="" alt="Photo">
+            <button class="lb-arrow lb-next" id="lb-next">›</button>
+        </div>
+
+        <!-- Thumbnail strip -->
+        <div class="lb-thumbs" id="lb-thumbs"></div>
+
+        <!-- Bottom bar -->
+        <div class="lb-bottombar">
+            <div class="lb-price-tag" id="lb-price"></div>
+            <button class="lb-dl-btn" id="lb-dl-btn">
+                ⬇️ Download Photo
+            </button>
+        </div>
+
     </div>
 </div>
 
@@ -482,13 +592,33 @@ document.addEventListener('DOMContentLoaded', () => {
         const total       = (order.designs||[]).reduce((s,d)=>s+Number(d.price||0),0);
         const sbMap       = { new:'sb-new', seen:'sb-seen', contacted:'sb-contacted', closed:'sb-closed' };
         const slMap       = { new:'🆕 New', seen:'👀 Seen', contacted:'📞 Contacted', closed:'✅ Closed' };
-        const designsHtml = (order.designs||[]).map(d=>`
-            <div class="design-chip" data-img="${d.image||''}" data-title="${d.title}" data-cat="${(d.category||'').replace(/-/g,' ')}" data-price="${d.price}">
-                <img src="${d.image||''}" alt="${d.title}" onerror="this.style.display='none'">
+        const designsHtml = (order.designs||[]).map(d => {
+            const imgs        = d.images?.length ? d.images : (d.image ? [d.image] : []);
+            const selectedImg = d.selectedImage || imgs[0] || '';
+            const selectedIdx = imgs.indexOf(selectedImg);
+            const otherImgs   = imgs.filter(s => s !== selectedImg).slice(0, 5);
+            const count       = imgs.length;
+
+            const otherStrip = otherImgs.map(s =>
+                `<img class="dc-strip-img" src="${s}" alt="" onerror="this.style.display='none'">`
+            ).join('');
+
+            return `<div class="design-chip"
+                data-imgs='${JSON.stringify(imgs)}'
+                data-selected-idx="${Math.max(0,selectedIdx)}"
+                data-title="${d.title.replace(/"/g,'&quot;')}"
+                data-cat="${(d.category||'').replace(/-/g,' ')}"
+                data-price="${d.price}">
+                <div class="dc-selected-wrap">
+                    <img class="dc-selected-img" src="${selectedImg}" alt="${d.title}" onerror="this.style.display='none'">
+                    <div class="dc-pick-badge">★ Customer's Pick</div>
+                </div>
+                ${otherImgs.length ? `<div class="dc-other-strip">${otherStrip}</div>` : ''}
                 <div class="dc-name">${d.title}</div>
                 <div class="dc-price">₹${Number(d.price).toLocaleString('en-IN')}/pc</div>
-                <div class="dc-zoom">🔍 Click to view</div>
-            </div>`).join('');
+                <div class="dc-zoom">${count > 1 ? `🖼️ ${count} photos — click` : '🔍 click to view'}</div>
+            </div>`;
+        }).join('');
 
         const waIcon = `<svg viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-14.416c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm.029 18.88c-1.161 0-2.305-.292-3.318-.844l-3.677.964.984-3.595c-.607-1.052-.927-2.246-.926-3.468.001-3.825 3.113-6.937 6.937-6.937 1.856.001 3.598.723 4.907 2.034 1.31 1.311 2.031 3.054 2.03 4.908-.001 3.825-3.113 6.938-6.937 6.938z"/></svg>`;
 
@@ -538,20 +668,22 @@ document.addEventListener('DOMContentLoaded', () => {
             card.querySelector('.chevron').classList.toggle('open');
         });
 
-        // ── Design chip → full-size lightbox ──
+        // ── Design chip → gallery lightbox (opens at customer's selected photo) ──
         card.querySelectorAll('.design-chip').forEach(chip => {
             chip.onclick = e => {
                 e.stopPropagation();
-                const img   = chip.dataset.img;
-                const title = chip.dataset.title;
-                const cat   = chip.dataset.cat;
-                const price = chip.dataset.price;
-                if (!img) return;
-                document.getElementById('photo-lb-img').src   = img;
-                document.getElementById('lb-title').textContent = title;
-                document.getElementById('lb-cat').textContent   = cat;
-                document.getElementById('lb-price').textContent = `₹${Number(price).toLocaleString('en-IN')}/pc`;
-                document.getElementById('photo-lb').classList.add('open');
+                let imgs;
+                try { imgs = JSON.parse(chip.dataset.imgs || '[]'); } catch { imgs = []; }
+                if (!imgs.length) return;
+                const selIdx = parseInt(chip.dataset.selectedIdx) || 0;
+                openGallery({
+                    images:      imgs,
+                    startIdx:    selIdx,
+                    selectedIdx: selIdx,
+                    title:       chip.dataset.title,
+                    category:    chip.dataset.cat,
+                    price:       chip.dataset.price
+                });
             };
         });
 
@@ -585,11 +717,104 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('search-box').addEventListener('input', render);
     document.getElementById('filter-status').addEventListener('change', render);
 
-    // ── Photo lightbox close ──
-    const photoLb = document.getElementById('photo-lb');
+    // ─── Photo Gallery Lightbox ────────────────────────────────
+    const photoLb    = document.getElementById('photo-lb');
+    const lbMainImg  = document.getElementById('lb-main-img');
+    const lbTitle    = document.getElementById('lb-title');
+    const lbCat      = document.getElementById('lb-cat');
+    const lbPrice    = document.getElementById('lb-price');
+    const lbCounter  = document.getElementById('lb-counter');
+    const lbThumbs   = document.getElementById('lb-thumbs');
+    const lbDlBtn    = document.getElementById('lb-dl-btn');
+    const lbPrev     = document.getElementById('lb-prev');
+    const lbNext     = document.getElementById('lb-next');
+
+    let lbImages = [], lbIdx = 0, lbMeta = {};
+
+    function openGallery({ images, startIdx = 0, selectedIdx = 0, title, category, price }) {
+        lbImages = images; lbIdx = 0;
+        lbMeta = { title, category, price, selectedIdx };
+        lbTitle.textContent = title;
+        lbCat.textContent   = category;
+        lbPrice.textContent = `₹${Number(price).toLocaleString('en-IN')}/pc`;
+
+        // Build thumbnail strip — gold border on customer's pick
+        lbThumbs.innerHTML = '';
+        if (images.length <= 1) {
+            lbThumbs.style.display = 'none';
+        } else {
+            lbThumbs.style.display = 'flex';
+            images.forEach((src, i) => {
+                const wrap = document.createElement('div');
+                wrap.style.cssText = 'position:relative;flex-shrink:0';
+                const t = document.createElement('img');
+                t.className = 'lb-thumb' + (i === startIdx ? ' active' : '');
+                t.src = src; t.alt = `Photo ${i+1}`;
+                t.style.border = i === selectedIdx ? '2px solid #fbbf24' : '';
+                t.onclick = () => lbGoTo(i);
+                wrap.appendChild(t);
+                if (i === selectedIdx) {
+                    const star = document.createElement('div');
+                    star.style.cssText = 'position:absolute;top:1px;right:1px;font-size:8px;background:rgba(251,191,36,0.9);color:#000;border-radius:3px;padding:1px 2px;font-weight:800;line-height:1';
+                    star.textContent = '★';
+                    wrap.appendChild(star);
+                }
+                lbThumbs.appendChild(wrap);
+            });
+        }
+
+        lbGoTo(startIdx);
+        photoLb.classList.add('open');
+    }
+
+    function lbGoTo(idx) {
+        lbIdx = Math.max(0, Math.min(idx, lbImages.length - 1));
+        // Fade
+        lbMainImg.classList.add('fading');
+        setTimeout(() => {
+            lbMainImg.src = lbImages[lbIdx];
+            lbMainImg.classList.remove('fading');
+        }, 100);
+        lbCounter.textContent = `${lbIdx+1} / ${lbImages.length}`;
+        lbPrev.disabled = lbIdx === 0;
+        lbNext.disabled = lbIdx === lbImages.length - 1;
+        // Sync thumbnails
+        lbThumbs.querySelectorAll('.lb-thumb').forEach((t, i) => t.classList.toggle('active', i === lbIdx));
+    }
+
+    lbPrev.onclick = () => lbGoTo(lbIdx - 1);
+    lbNext.onclick = () => lbGoTo(lbIdx + 1);
     document.getElementById('photo-lb-close').onclick = () => photoLb.classList.remove('open');
     photoLb.addEventListener('click', e => { if (e.target === photoLb) photoLb.classList.remove('open'); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') photoLb.classList.remove('open'); });
+    document.addEventListener('keydown', e => {
+        if (!photoLb.classList.contains('open')) return;
+        if (e.key === 'Escape')      photoLb.classList.remove('open');
+        if (e.key === 'ArrowLeft')   lbGoTo(lbIdx - 1);
+        if (e.key === 'ArrowRight')  lbGoTo(lbIdx + 1);
+    });
+
+    // ── Download current photo ──
+    lbDlBtn.onclick = async () => {
+        const src  = lbImages[lbIdx];
+        if (!src) return;
+        lbDlBtn.disabled = true;
+        lbDlBtn.textContent = 'Downloading…';
+        try {
+            const img = new Image(); img.crossOrigin = 'anonymous'; img.src = src;
+            await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+            const cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+            cv.getContext('2d').drawImage(img, 0, 0);
+            const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.95));
+            const slug = (lbMeta.title || 'photo').replace(/\s+/g,'_').toLowerCase();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${slug}_photo${lbIdx+1}.jpg`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            toast(`⬇️ Downloaded photo ${lbIdx+1}`, 'ok');
+        } catch { toast('Download failed — image may be cross-origin', 'err'); }
+        finally { lbDlBtn.disabled = false; lbDlBtn.textContent = '⬇️ Download Photo'; }
+    };
 
     // ─── Export CSV ───────────────────────────────────────────────────
     document.getElementById('export-btn').onclick = () => {
