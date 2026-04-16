@@ -206,10 +206,6 @@
             border-radius:5px; padding:2px 5px; display:flex; align-items:center; gap:2px;
         }
 
-        /* Other photos mini-strip */
-        .dc-other-strip { display:flex; gap:3px; margin-bottom:0.35rem; justify-content:center; flex-wrap:wrap; }
-        .dc-strip-img { width:28px; height:28px; object-fit:cover; border-radius:4px; border:1.5px solid rgba(255,255,255,0.1); flex-shrink:0; }
-
         /* Multiple selected photos grid */
         .dc-picks-grid { display:grid; gap:3px; margin-bottom:0.4rem; }
         .dc-picks-grid.n1 { grid-template-columns:1fr; }
@@ -220,13 +216,13 @@
         .dc-pick-star {
             position:absolute; top:2px; left:2px;
             background:rgba(251,191,36,0.9); color:#000;
-            font-size:0.5rem; font-weight:900; border-radius:3px;
+            font-size:0.55rem; font-weight:900; border-radius:3px;
             padding:1px 3px; line-height:1.3;
         }
 
-        .dc-name  { font-size:0.66rem; color:rgba(255,255,255,0.5); line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:0.2rem; }
-        .dc-price { font-size:0.72rem; font-weight:700; color:#fbbf24; }
-        .dc-zoom  { font-size:0.58rem; color:rgba(255,255,255,0.22); margin-top:0.15rem; }
+        .dc-name  { font-size:0.68rem; color:rgba(255,255,255,0.7); line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:0.2rem; font-weight: 500; }
+        .dc-price { font-size:0.75rem; font-weight:800; color:#fbbf24; }
+        .dc-zoom  { font-size:0.6rem; color:rgba(255,255,255,0.3); margin-top:0.2rem; display: block; }
 
         /* ── Photo Gallery Lightbox ── */
         .photo-lb-overlay {
@@ -335,8 +331,21 @@
         .lb-thumb.active { border-color:#a78bfa; opacity:1; }
         .lb-thumb:hover   { opacity:0.85; }
 
-        @media(max-width:700px){ .stats-row{grid-template-columns:1fr 1fr} .controls{flex-direction:column;align-items:stretch} .oh-date{display:none} }
-        @media(max-width:480px){ .stats-row{grid-template-columns:1fr} }
+        @media(max-width:700px){ 
+            .stats-row{grid-template-columns:1fr 1fr} 
+            .controls{flex-direction:column;align-items:stretch} 
+            .oh-date{display:none} 
+            .page { padding: 1.5rem 1rem 5rem; }
+            .order-head { flex-direction:column; align-items:flex-start; gap: 0.75rem; }
+            .oh-meta { width:100%; justify-content:space-between; }
+        }
+        @media(max-width:480px){ 
+            .stats-row{grid-template-columns:1fr} 
+            .lb-bottombar { flex-direction:column; align-items:stretch; }
+            .lb-dl-btn { width: 100%; justify-content:center; }
+            .body-actions { flex-direction:column; align-items:stretch; }
+            .body-actions > * { width: 100%; text-align:center; }
+        }
     </style>
 </head>
 <body>
@@ -608,17 +617,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const slMap       = { new:'🆕 New', seen:'👀 Seen', contacted:'📞 Contacted', closed:'✅ Closed' };
         const designsHtml = (order.designs||[]).map(d => {
             const allImgs      = d.images?.length ? d.images : (d.image ? [d.image] : []);
-            // Support both old (selectedImage) and new (selectedImages[]) format
             let selImgs = d.selectedImages?.length ? d.selectedImages
                         : d.selectedImage         ? [d.selectedImage]
                         : [allImgs[0] || ''];
             selImgs = selImgs.filter(s => s); // remove empty
 
-            const otherImgs  = allImgs.filter(s => !selImgs.includes(s)).slice(0, 6);
-            const totalCount = allImgs.length;
             const selCount   = selImgs.length;
-
-            // Grid class based on count
             const gridClass = `n${Math.min(selCount, 4)}`;
 
             const picksHtml = selImgs.slice(0,4).map((s, i) => `
@@ -626,10 +630,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <img src="${s}" alt="Pick ${i+1}" onerror="this.style.display='none'">
                     <div class="dc-pick-star">★${i+1}</div>
                 </div>`).join('');
-
-            const stripHtml = otherImgs.map(s =>
-                `<img class="dc-strip-img" src="${s}" alt="" onerror="this.style.display='none'">`
-            ).join('');
 
             const selIdxArr = selImgs.map(s => allImgs.indexOf(s)).filter(i => i >= 0);
 
@@ -640,12 +640,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 data-cat="${(d.category||'').replace(/-/g,' ')}"
                 data-price="${d.price}">
                 <div class="dc-picks-grid ${gridClass}">${picksHtml}</div>
-                ${otherImgs.length ? `<div class="dc-other-strip">${stripHtml}</div>` : ''}
                 <div class="dc-name">${d.title}</div>
                 <div class="dc-price">₹${Number(d.price).toLocaleString('en-IN')}/pc</div>
                 <div class="dc-zoom">
                     ${selCount > 1 ? `★ ${selCount} colors picked` : '★ 1 color picked'}
-                    ${totalCount > selCount ? ` — ${totalCount} total` : ''}
                 </div>
             </div>`;
         }).join('');
@@ -734,13 +732,18 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // ── Delete ──
-        card.querySelector('.del-btn').onclick = e => {
-            e.stopPropagation();
-            if (!confirm(`Delete enquiry from ${order.name}?`)) return;
-            orders = orders.filter(x => x.id !== order.id);
-            saveOrders(); render();
-            toast('🗑 Enquiry deleted');
-        };
+        const delBtn = card.querySelector('.del-btn');
+        if(delBtn) {
+            delBtn.onclick = e => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!confirm(`Delete enquiry from ${order.name}?`)) return;
+                orders = orders.filter(x => String(x.id) !== String(order.id));
+                saveOrders();
+                render();
+                toast('🗑 Enquiry deleted');
+            };
+        }
 
         return card;
     }
