@@ -187,6 +187,52 @@
         .ot.err { border-color:rgba(239,68,68,0.45); }
         @keyframes slu { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
 
+        /* ── Designs grid (clickable) ── */
+        .designs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:0.65rem; margin:0.85rem 0; }
+        .design-chip {
+            background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09);
+            border-radius:10px; padding:0.5rem; text-align:center;
+            cursor:pointer; transition:border-color 0.2s, transform 0.15s;
+        }
+        .design-chip:hover { border-color:rgba(251,191,36,0.45); transform:translateY(-2px); }
+        .design-chip img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; margin-bottom:0.35rem; display:block; }
+        .dc-name  { font-size:0.66rem; color:rgba(255,255,255,0.5); line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:0.2rem; }
+        .dc-price { font-size:0.72rem; font-weight:700; color:#fbbf24; }
+        .dc-zoom  { font-size:0.6rem; color:rgba(255,255,255,0.25); margin-top:0.15rem; }
+
+        /* ── Photo Lightbox (admin view) ── */
+        .photo-lb-overlay {
+            display:none; position:fixed; inset:0; z-index:2000;
+            background:rgba(0,0,0,0.9); backdrop-filter:blur(10px);
+            align-items:center; justify-content:center; padding:1rem;
+            animation:fadeIn 0.2s ease;
+        }
+        .photo-lb-overlay.open { display:flex; }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        .photo-lb-inner {
+            position:relative; max-width:640px; width:100%;
+            background:#1a1b26; border:1px solid rgba(255,255,255,0.1);
+            border-radius:20px; overflow:hidden;
+            box-shadow:0 32px 80px rgba(0,0,0,0.7);
+            animation:scaleIn 0.25s ease;
+        }
+        @keyframes scaleIn { from{transform:scale(0.93);opacity:0} to{transform:scale(1);opacity:1} }
+        .photo-lb-img { width:100%; max-height:65vh; object-fit:contain; display:block; background:#111; }
+        .photo-lb-info {
+            padding:1.1rem 1.25rem;
+            display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;
+        }
+        .photo-lb-info .lb-title { font-weight:700; font-size:1rem; }
+        .photo-lb-info .lb-cat   { font-size:0.75rem; color:rgba(255,255,255,0.4); margin-top:0.1rem; }
+        .photo-lb-info .lb-price { font-size:1.15rem; font-weight:800; color:#fbbf24; }
+        .photo-lb-close {
+            position:absolute; top:0.75rem; right:0.75rem;
+            background:rgba(0,0,0,0.6); border:none; color:#fff;
+            width:34px; height:34px; border-radius:50%; font-size:1.1rem;
+            cursor:pointer; display:grid; place-items:center; transition:background 0.2s; z-index:10;
+        }
+        .photo-lb-close:hover { background:rgba(239,68,68,0.7); }
+
         @media(max-width:700px){ .stats-row{grid-template-columns:1fr 1fr} .controls{flex-direction:column;align-items:stretch} .oh-date{display:none} }
         @media(max-width:480px){ .stats-row{grid-template-columns:1fr} }
     </style>
@@ -226,6 +272,21 @@
 
     <div class="orders-list" id="orders-list">
         <div class="empty-orders"><div class="eo-ico">📭</div><p>No enquiries yet.</p></div>
+    </div>
+</div>
+
+<!-- ══ PHOTO LIGHTBOX ══ -->
+<div class="photo-lb-overlay" id="photo-lb">
+    <div class="photo-lb-inner">
+        <button class="photo-lb-close" id="photo-lb-close">✕</button>
+        <img class="photo-lb-img" id="photo-lb-img" src="" alt="">
+        <div class="photo-lb-info">
+            <div>
+                <div class="lb-title" id="lb-title"></div>
+                <div class="lb-cat"   id="lb-cat"></div>
+            </div>
+            <div class="lb-price" id="lb-price"></div>
+        </div>
     </div>
 </div>
 
@@ -422,10 +483,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const sbMap       = { new:'sb-new', seen:'sb-seen', contacted:'sb-contacted', closed:'sb-closed' };
         const slMap       = { new:'🆕 New', seen:'👀 Seen', contacted:'📞 Contacted', closed:'✅ Closed' };
         const designsHtml = (order.designs||[]).map(d=>`
-            <div class="design-chip">
+            <div class="design-chip" data-img="${d.image||''}" data-title="${d.title}" data-cat="${(d.category||'').replace(/-/g,' ')}" data-price="${d.price}">
                 <img src="${d.image||''}" alt="${d.title}" onerror="this.style.display='none'">
                 <div class="dc-name">${d.title}</div>
-                <div class="dc-price">₹${Number(d.price).toLocaleString('en-IN')}</div>
+                <div class="dc-price">₹${Number(d.price).toLocaleString('en-IN')}/pc</div>
+                <div class="dc-zoom">🔍 Click to view</div>
             </div>`).join('');
 
         const waIcon = `<svg viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-14.416c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm.029 18.88c-1.161 0-2.305-.292-3.318-.844l-3.677.964.984-3.595c-.607-1.052-.927-2.246-.926-3.468.001-3.825 3.113-6.937 6.937-6.937 1.856.001 3.598.723 4.907 2.034 1.31 1.311 2.031 3.054 2.03 4.908-.001 3.825-3.113 6.938-6.937 6.938z"/></svg>`;
@@ -476,6 +538,23 @@ document.addEventListener('DOMContentLoaded', () => {
             card.querySelector('.chevron').classList.toggle('open');
         });
 
+        // ── Design chip → full-size lightbox ──
+        card.querySelectorAll('.design-chip').forEach(chip => {
+            chip.onclick = e => {
+                e.stopPropagation();
+                const img   = chip.dataset.img;
+                const title = chip.dataset.title;
+                const cat   = chip.dataset.cat;
+                const price = chip.dataset.price;
+                if (!img) return;
+                document.getElementById('photo-lb-img').src   = img;
+                document.getElementById('lb-title').textContent = title;
+                document.getElementById('lb-cat').textContent   = cat;
+                document.getElementById('lb-price').textContent = `₹${Number(price).toLocaleString('en-IN')}/pc`;
+                document.getElementById('photo-lb').classList.add('open');
+            };
+        });
+
         // ── WA buttons (both head & body) ──
         card.querySelectorAll('.wa-btn').forEach(btn => {
             btn.onclick = e => {
@@ -505,6 +584,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('search-box').addEventListener('input', render);
     document.getElementById('filter-status').addEventListener('change', render);
+
+    // ── Photo lightbox close ──
+    const photoLb = document.getElementById('photo-lb');
+    document.getElementById('photo-lb-close').onclick = () => photoLb.classList.remove('open');
+    photoLb.addEventListener('click', e => { if (e.target === photoLb) photoLb.classList.remove('open'); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') photoLb.classList.remove('open'); });
 
     // ─── Export CSV ───────────────────────────────────────────────────
     document.getElementById('export-btn').onclick = () => {
