@@ -15,31 +15,89 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let popupTriggered = false; // only fire the popup once per session
 
+    // ── toggleFav: remove OR open picker ──
     function toggleFav(product, images) {
         const idx = favourites.findIndex(f => f.id === product.id);
         if (idx >= 0) {
+            // Un-favourite directly
             favourites.splice(idx, 1);
-        } else {
-            // NO hard limit — user can select as many as they want
-            favourites.push({
-                id:       product.id,
-                title:    product.title,
-                category: product.category,
-                price:    product.price,
-                image:    images[0] || ''
-            });
+            saveFavs();
+            refreshFavUI();
+            return;
         }
+        // Adding: single image → add instantly, multiple → show picker
+        if (images.length > 1) {
+            openPhotoPicker(product, images);
+        } else {
+            pushFav(product, images, images[0] || '');
+        }
+    }
+
+    // ── Actually push a favourite (called after picker or for single-image) ──
+    function pushFav(product, images, selectedImage) {
+        favourites.push({
+            id:            product.id,
+            title:         product.title,
+            category:      product.category,
+            price:         product.price,
+            image:         selectedImage,      // shown in drawer
+            selectedImage: selectedImage,      // customer's explicit pick
+            images:        images              // all photos → admin gallery
+        });
         saveFavs();
         refreshFavUI();
-        // Auto-open drawer after first selection
         if (favourites.length === 1) openDrawer();
-        // Fire enquiry popup once when they first hit the milestone
         if (!popupTriggered && favourites.length === POPUP_TRIGGER) {
             popupTriggered = true;
             setTimeout(() => openOrderModal(), 400);
         }
-        return true;
     }
+
+    // ── Photo Picker Modal ──
+    let ppPendingProduct = null, ppPendingImages = [], ppSelectedSrc = null;
+
+    function openPhotoPicker(product, images) {
+        ppPendingProduct = product;
+        ppPendingImages  = images;
+        ppSelectedSrc    = null;
+
+        document.getElementById('pp-name').textContent = product.title;
+        document.getElementById('pp-add-btn').disabled = true;
+
+        const grid = document.getElementById('pp-grid');
+        grid.innerHTML = '';
+        images.forEach((src, i) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'pp-thumb';
+            wrap.innerHTML = `
+                <img src="${src}" alt="Photo ${i+1}" loading="lazy">
+                <div class="pp-check-ico">✓</div>
+                <div class="pp-num">${i+1}</div>`;
+            wrap.onclick = () => {
+                grid.querySelectorAll('.pp-thumb').forEach(t => t.classList.remove('selected'));
+                wrap.classList.add('selected');
+                ppSelectedSrc = src;
+                document.getElementById('pp-add-btn').disabled = false;
+            };
+            grid.appendChild(wrap);
+        });
+
+        document.getElementById('pp-overlay').classList.add('open');
+    }
+
+    // Picker controls wired after DOM ready — placed here so they share closure
+    document.getElementById('pp-overlay').addEventListener('click', e => {
+        if (e.target === document.getElementById('pp-overlay')) document.getElementById('pp-overlay').classList.remove('open');
+    });
+    document.getElementById('pp-close').onclick   = () => document.getElementById('pp-overlay').classList.remove('open');
+    document.getElementById('pp-cancel').onclick  = () => document.getElementById('pp-overlay').classList.remove('open');
+    document.getElementById('pp-add-btn').onclick = () => {
+        if (!ppSelectedSrc || !ppPendingProduct) return;
+        document.getElementById('pp-overlay').classList.remove('open');
+        pushFav(ppPendingProduct, ppPendingImages, ppSelectedSrc);
+        showToast('❤️ Added to favourites!');
+    };
+
 
     // refresh every heart button on the page
     function refreshHeartButtons() {
