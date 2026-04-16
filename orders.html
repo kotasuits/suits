@@ -496,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (selCount > 1) return `• ${d.title} (${selCount} colors)\n  ₹${itemPrice.toLocaleString('en-IN')} x ${selCount} = ₹${(selCount * itemPrice).toLocaleString('en-IN')}/pc`;
                 return `• ${d.title} — ₹${itemPrice.toLocaleString('en-IN')}/pc`;
             }).join('\n\n');
-            return `Hi ${o.name}! Here is the pricing for your selected Kota Doria designs:\n\n${designs}\n\n*Estimated Order Total: ₹${totalEst.toLocaleString('en-IN')}*\n(Note: Wholesale MOQ is 30-50 pcs per color).\n\nInterested in placing an order? Reply to confirm! 🎀`; 
+            return `Hi ${o.name}! Here is the pricing for your selected Kota Doria designs:\n\n${designs}\n\n*Estimated Order Total: ₹${totalEst.toLocaleString('en-IN')}*\n(Note: Wholesale MOQ is 30-50 pcs).\n\nInterested in placing an order? Reply to confirm! 🎀`; 
         } },
         { label: '✅ Order Ready',     text: (o) => `Dear ${o.name}, your Kota Doria order is ready for dispatch! Kindly confirm your delivery address and preferred courier. We look forward to serving you again! 🛍️` },
         { label: '🎉 Follow Up',       text: (o) => `Hi ${o.name}! 👋 Just following up on your Kota Doria enquiry for ${o.designs?.length || 0} designs. Let us know if you have any questions — we're happy to help!` },
