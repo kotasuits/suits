@@ -210,6 +210,20 @@
         .dc-other-strip { display:flex; gap:3px; margin-bottom:0.35rem; justify-content:center; flex-wrap:wrap; }
         .dc-strip-img { width:28px; height:28px; object-fit:cover; border-radius:4px; border:1.5px solid rgba(255,255,255,0.1); flex-shrink:0; }
 
+        /* Multiple selected photos grid */
+        .dc-picks-grid { display:grid; gap:3px; margin-bottom:0.4rem; }
+        .dc-picks-grid.n1 { grid-template-columns:1fr; }
+        .dc-picks-grid.n2 { grid-template-columns:1fr 1fr; }
+        .dc-picks-grid.n3,.dc-picks-grid.n4 { grid-template-columns:1fr 1fr; }
+        .dc-pick-item { position:relative; border-radius:6px; overflow:hidden; border:2px solid rgba(251,191,36,0.7); }
+        .dc-pick-item img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
+        .dc-pick-star {
+            position:absolute; top:2px; left:2px;
+            background:rgba(251,191,36,0.9); color:#000;
+            font-size:0.5rem; font-weight:900; border-radius:3px;
+            padding:1px 3px; line-height:1.3;
+        }
+
         .dc-name  { font-size:0.66rem; color:rgba(255,255,255,0.5); line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:0.2rem; }
         .dc-price { font-size:0.72rem; font-weight:700; color:#fbbf24; }
         .dc-zoom  { font-size:0.58rem; color:rgba(255,255,255,0.22); margin-top:0.15rem; }
@@ -593,30 +607,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const sbMap       = { new:'sb-new', seen:'sb-seen', contacted:'sb-contacted', closed:'sb-closed' };
         const slMap       = { new:'🆕 New', seen:'👀 Seen', contacted:'📞 Contacted', closed:'✅ Closed' };
         const designsHtml = (order.designs||[]).map(d => {
-            const imgs        = d.images?.length ? d.images : (d.image ? [d.image] : []);
-            const selectedImg = d.selectedImage || imgs[0] || '';
-            const selectedIdx = imgs.indexOf(selectedImg);
-            const otherImgs   = imgs.filter(s => s !== selectedImg).slice(0, 5);
-            const count       = imgs.length;
+            const allImgs      = d.images?.length ? d.images : (d.image ? [d.image] : []);
+            // Support both old (selectedImage) and new (selectedImages[]) format
+            let selImgs = d.selectedImages?.length ? d.selectedImages
+                        : d.selectedImage         ? [d.selectedImage]
+                        : [allImgs[0] || ''];
+            selImgs = selImgs.filter(s => s); // remove empty
 
-            const otherStrip = otherImgs.map(s =>
+            const otherImgs  = allImgs.filter(s => !selImgs.includes(s)).slice(0, 6);
+            const totalCount = allImgs.length;
+            const selCount   = selImgs.length;
+
+            // Grid class based on count
+            const gridClass = `n${Math.min(selCount, 4)}`;
+
+            const picksHtml = selImgs.slice(0,4).map((s, i) => `
+                <div class="dc-pick-item">
+                    <img src="${s}" alt="Pick ${i+1}" onerror="this.style.display='none'">
+                    <div class="dc-pick-star">★${i+1}</div>
+                </div>`).join('');
+
+            const stripHtml = otherImgs.map(s =>
                 `<img class="dc-strip-img" src="${s}" alt="" onerror="this.style.display='none'">`
             ).join('');
 
+            const selIdxArr = selImgs.map(s => allImgs.indexOf(s)).filter(i => i >= 0);
+
             return `<div class="design-chip"
-                data-imgs='${JSON.stringify(imgs)}'
-                data-selected-idx="${Math.max(0,selectedIdx)}"
+                data-imgs='${JSON.stringify(allImgs)}'
+                data-sel-idxs='${JSON.stringify(selIdxArr)}'
                 data-title="${d.title.replace(/"/g,'&quot;')}"
                 data-cat="${(d.category||'').replace(/-/g,' ')}"
                 data-price="${d.price}">
-                <div class="dc-selected-wrap">
-                    <img class="dc-selected-img" src="${selectedImg}" alt="${d.title}" onerror="this.style.display='none'">
-                    <div class="dc-pick-badge">★ Customer's Pick</div>
-                </div>
-                ${otherImgs.length ? `<div class="dc-other-strip">${otherStrip}</div>` : ''}
+                <div class="dc-picks-grid ${gridClass}">${picksHtml}</div>
+                ${otherImgs.length ? `<div class="dc-other-strip">${stripHtml}</div>` : ''}
                 <div class="dc-name">${d.title}</div>
                 <div class="dc-price">₹${Number(d.price).toLocaleString('en-IN')}/pc</div>
-                <div class="dc-zoom">${count > 1 ? `🖼️ ${count} photos — click` : '🔍 click to view'}</div>
+                <div class="dc-zoom">
+                    ${selCount > 1 ? `★ ${selCount} colors picked` : '★ 1 color picked'}
+                    ${totalCount > selCount ? ` — ${totalCount} total` : ''}
+                </div>
             </div>`;
         }).join('');
 
@@ -668,18 +698,19 @@ document.addEventListener('DOMContentLoaded', () => {
             card.querySelector('.chevron').classList.toggle('open');
         });
 
-        // ── Design chip → gallery lightbox (opens at customer's selected photo) ──
+        // ── Design chip → gallery (opens at first selected photo, all picks highlighted) ──
         card.querySelectorAll('.design-chip').forEach(chip => {
             chip.onclick = e => {
                 e.stopPropagation();
-                let imgs;
-                try { imgs = JSON.parse(chip.dataset.imgs || '[]'); } catch { imgs = []; }
+                let imgs, selIdxs;
+                try { imgs    = JSON.parse(chip.dataset.imgs    || '[]'); } catch { imgs = []; }
+                try { selIdxs = JSON.parse(chip.dataset.selIdxs || '[0]'); } catch { selIdxs = [0]; }
                 if (!imgs.length) return;
-                const selIdx = parseInt(chip.dataset.selectedIdx) || 0;
                 openGallery({
                     images:      imgs,
-                    startIdx:    selIdx,
-                    selectedIdx: selIdx,
+                    startIdx:    selIdxs[0] || 0,
+                    selectedIdx: selIdxs[0] || 0,
+                    selIdxs:     selIdxs,
                     title:       chip.dataset.title,
                     category:    chip.dataset.cat,
                     price:       chip.dataset.price
@@ -731,32 +762,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let lbImages = [], lbIdx = 0, lbMeta = {};
 
-    function openGallery({ images, startIdx = 0, selectedIdx = 0, title, category, price }) {
+    function openGallery({ images, startIdx = 0, selectedIdx = 0, selIdxs = [], title, category, price }) {
         lbImages = images; lbIdx = 0;
-        lbMeta = { title, category, price, selectedIdx };
+        const allSelIdx = selIdxs.length ? selIdxs : [selectedIdx];
+        lbMeta = { title, category, price, allSelIdx };
         lbTitle.textContent = title;
         lbCat.textContent   = category;
         lbPrice.textContent = `₹${Number(price).toLocaleString('en-IN')}/pc`;
 
-        // Build thumbnail strip — gold border on customer's pick
+        // Build thumbnail strip — gold ★ on ALL customer picks
         lbThumbs.innerHTML = '';
         if (images.length <= 1) {
             lbThumbs.style.display = 'none';
         } else {
             lbThumbs.style.display = 'flex';
             images.forEach((src, i) => {
+                const isPick = allSelIdx.includes(i);
+                const pickNum = allSelIdx.indexOf(i) + 1;
                 const wrap = document.createElement('div');
                 wrap.style.cssText = 'position:relative;flex-shrink:0';
                 const t = document.createElement('img');
                 t.className = 'lb-thumb' + (i === startIdx ? ' active' : '');
                 t.src = src; t.alt = `Photo ${i+1}`;
-                t.style.border = i === selectedIdx ? '2px solid #fbbf24' : '';
+                t.style.border = isPick ? '2px solid #fbbf24' : '';
                 t.onclick = () => lbGoTo(i);
                 wrap.appendChild(t);
-                if (i === selectedIdx) {
+                if (isPick) {
                     const star = document.createElement('div');
-                    star.style.cssText = 'position:absolute;top:1px;right:1px;font-size:8px;background:rgba(251,191,36,0.9);color:#000;border-radius:3px;padding:1px 2px;font-weight:800;line-height:1';
-                    star.textContent = '★';
+                    star.style.cssText = 'position:absolute;top:1px;right:1px;font-size:8px;background:rgba(251,191,36,0.92);color:#000;border-radius:3px;padding:1px 3px;font-weight:900;line-height:1.2';
+                    star.textContent = `★${pickNum}`;
                     wrap.appendChild(star);
                 }
                 lbThumbs.appendChild(wrap);
