@@ -487,7 +487,17 @@ document.addEventListener('DOMContentLoaded', () => {
         { label: '👋 Greeting',       text: (o) => `Hi ${o.name}! 🙏 This is Kota Doria Wholesale. Thank you for your enquiry for ${o.designs?.length || 0} designs. We'd love to help you place your order!` },
         { label: '📦 Confirm Order',   text: (o) => `Hello ${o.name}, we have received your selection of ${o.designs?.length || 0} designs from Kota Doria. Please confirm your order quantity so we can process it. Minimum 30-50 pcs per design.` },
         { label: '📞 Request Call',    text: (o) => `Hi ${o.name}, this is Kota Doria Wholesale. Can we schedule a quick call to discuss your enquiry for ${o.designs?.length || 0} designs? Please let us know your preferred time.` },
-        { label: '💰 Share Pricing',   text: (o) => { const designs = (o.designs||[]).map(d=>`• ${d.title} — ₹${Number(d.price).toLocaleString('en-IN')}/pc`).join('\n'); return `Hi ${o.name}! Here are the prices for your selected Kota Doria designs:\n\n${designs}\n\nMinimum order: 30-50 pcs per design. Interested? Reply to confirm! 🎀`; } },
+        { label: '💰 Share Pricing',   text: (o) => { 
+            let totalEst = 0;
+            const designs = (o.designs||[]).map(d => {
+                const selCount = Math.max(1, (d.selectedImages || []).length || (d.selectedImage ? 1 : 1));
+                const itemPrice = Number(d.price) || 0;
+                totalEst += (selCount * itemPrice);
+                if (selCount > 1) return `• ${d.title} (${selCount} colors)\n  ₹${itemPrice.toLocaleString('en-IN')} x ${selCount} = ₹${(selCount * itemPrice).toLocaleString('en-IN')}/pc`;
+                return `• ${d.title} — ₹${itemPrice.toLocaleString('en-IN')}/pc`;
+            }).join('\n\n');
+            return `Hi ${o.name}! Here is the pricing for your selected Kota Doria designs:\n\n${designs}\n\n*Estimated Order Total: ₹${totalEst.toLocaleString('en-IN')}*\n(Note: Wholesale MOQ is 30-50 pcs per color).\n\nInterested in placing an order? Reply to confirm! 🎀`; 
+        } },
         { label: '✅ Order Ready',     text: (o) => `Dear ${o.name}, your Kota Doria order is ready for dispatch! Kindly confirm your delivery address and preferred courier. We look forward to serving you again! 🛍️` },
         { label: '🎉 Follow Up',       text: (o) => `Hi ${o.name}! 👋 Just following up on your Kota Doria enquiry for ${o.designs?.length || 0} designs. Let us know if you have any questions — we're happy to help!` },
     ];
