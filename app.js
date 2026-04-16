@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const productGrid = document.getElementById('product-grid');
-    const MAX_FAV = 10;
+    const POPUP_TRIGGER = 10; // popup fires at this count — NOT a hard limit
 
     // ════════════════════════════════════════════
     //  FAVOURITES STATE
@@ -13,15 +13,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function isFaved(id) { return favourites.some(f => f.id === id); }
 
+    let popupTriggered = false; // only fire the popup once per session
+
     function toggleFav(product, images) {
         const idx = favourites.findIndex(f => f.id === product.id);
         if (idx >= 0) {
             favourites.splice(idx, 1);
         } else {
-            if (favourites.length >= MAX_FAV) {
-                showToast('⚠️ You can select up to 10 designs. Remove one first.');
-                return false;
-            }
+            // NO hard limit — user can select as many as they want
             favourites.push({
                 id:       product.id,
                 title:    product.title,
@@ -32,10 +31,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         saveFavs();
         refreshFavUI();
-        // Auto-open drawer after first fav
+        // Auto-open drawer after first selection
         if (favourites.length === 1) openDrawer();
-        // Auto-trigger order modal at 10
-        if (favourites.length === MAX_FAV) {
+        // Fire enquiry popup once when they first hit the milestone
+        if (!popupTriggered && favourites.length === POPUP_TRIGGER) {
+            popupTriggered = true;
             setTimeout(() => openOrderModal(), 400);
         }
         return true;
@@ -85,29 +85,31 @@ document.addEventListener('DOMContentLoaded', () => {
     favOverlay.onclick = closeDrawer;
 
     function renderDrawer() {
-        drawerCountEl.textContent = favourites.length;
-        const pct = Math.min(100, (favourites.length / MAX_FAV) * 100);
-        progFill.style.width  = pct + '%';
-        progCount.textContent = `${favourites.length} / ${MAX_FAV}`;
+        const n = favourites.length;
+        drawerCountEl.textContent = n;
 
-        if (favourites.length === 0) {
-            progText.innerHTML = `Select <b>${MAX_FAV}</b> designs to enquire`;
+        // Progress bar pulses at milestone, fills proportionally up to POPUP_TRIGGER, then stays full
+        const pct = n === 0 ? 0 : n < POPUP_TRIGGER ? (n / POPUP_TRIGGER) * 100 : 100;
+        progFill.style.width  = pct + '%';
+        progCount.textContent = `${n} selected`;
+
+        if (n === 0) {
+            progText.innerHTML = `Tap ❤️ on any design to add it here`;
             drawerBody.innerHTML = `<div class="drawer-empty"><div class="de-ico">💔</div><p>No favourites yet.<br>Tap the ❤️ on any design!</p></div>`;
             btnOrder.disabled = true;
-            btnOrder.textContent = `📋 Send Enquiry (select 10 designs)`;
+            btnOrder.textContent = `📋 Send Enquiry`;
             return;
         }
 
-        const remaining = MAX_FAV - favourites.length;
-        if (remaining > 0) {
-            progText.innerHTML = `Select <b>${remaining} more</b> design${remaining !== 1 ? 's' : ''} to enquire`;
+        // Button always enabled once 1+ item selected — no minimum
+        btnOrder.disabled    = false;
+        btnOrder.textContent = `📋 Send Enquiry (${n} design${n !== 1 ? 's' : ''})`;
+
+        if (n < POPUP_TRIGGER) {
+            progText.innerHTML = `${n} selected — keep adding or send now!`;
         } else {
-            progText.innerHTML = `✅ Ready! Submit your enquiry`;
+            progText.innerHTML = `✅ ${n} designs selected — ready to enquire!`;
         }
-        btnOrder.disabled    = favourites.length < MAX_FAV;
-        btnOrder.textContent = favourites.length >= MAX_FAV
-            ? `📋 Send Enquiry (${MAX_FAV} designs ready!)`
-            : `📋 Send Enquiry (${favourites.length}/${MAX_FAV} selected)`;
 
         drawerBody.innerHTML = '';
         favourites.forEach((item, i) => {
