@@ -33,16 +33,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ── Actually push a favourite (called after picker or for single-image) ──
-    function pushFav(product, images, selectedImage) {
+    // ── Actually push a favourite — selectedImages is always an array ──
+    function pushFav(product, images, selectedImages) {
+        // Normalise: single string → array (for single-image products)
+        if (!Array.isArray(selectedImages)) selectedImages = [selectedImages];
         favourites.push({
-            id:            product.id,
-            title:         product.title,
-            category:      product.category,
-            price:         product.price,
-            image:         selectedImage,      // shown in drawer
-            selectedImage: selectedImage,      // customer's explicit pick
-            images:        images              // all photos → admin gallery
+            id:             product.id,
+            title:          product.title,
+            category:       product.category,
+            price:          product.price,
+            image:          selectedImages[0] || '',  // first pick → drawer thumb
+            selectedImages: selectedImages,           // all customer's chosen photos
+            images:         images                    // full gallery → admin
         });
         saveFavs();
         refreshFavUI();
@@ -53,16 +55,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ── Photo Picker Modal ──
-    let ppPendingProduct = null, ppPendingImages = [], ppSelectedSrc = null;
+    // ── Photo Picker Modal — MULTI-SELECT ──
+    let ppPendingProduct = null, ppPendingImages = [], ppSelectedSrcs = new Set();
 
     function openPhotoPicker(product, images) {
         ppPendingProduct = product;
         ppPendingImages  = images;
-        ppSelectedSrc    = null;
+        ppSelectedSrcs   = new Set();
 
         document.getElementById('pp-name').textContent = product.title;
-        document.getElementById('pp-add-btn').disabled = true;
+        updatePpBtn();
 
         const grid = document.getElementById('pp-grid');
         grid.innerHTML = '';
@@ -74,10 +76,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="pp-check-ico">✓</div>
                 <div class="pp-num">${i+1}</div>`;
             wrap.onclick = () => {
-                grid.querySelectorAll('.pp-thumb').forEach(t => t.classList.remove('selected'));
-                wrap.classList.add('selected');
-                ppSelectedSrc = src;
-                document.getElementById('pp-add-btn').disabled = false;
+                // TOGGLE selection — multi-select
+                if (ppSelectedSrcs.has(src)) {
+                    ppSelectedSrcs.delete(src);
+                    wrap.classList.remove('selected');
+                } else {
+                    ppSelectedSrcs.add(src);
+                    wrap.classList.add('selected');
+                }
+                updatePpBtn();
             };
             grid.appendChild(wrap);
         });
@@ -85,18 +92,15 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('pp-overlay').classList.add('open');
     }
 
-    // Picker controls wired after DOM ready — placed here so they share closure
-    document.getElementById('pp-overlay').addEventListener('click', e => {
-        if (e.target === document.getElementById('pp-overlay')) document.getElementById('pp-overlay').classList.remove('open');
-    });
-    document.getElementById('pp-close').onclick   = () => document.getElementById('pp-overlay').classList.remove('open');
-    document.getElementById('pp-cancel').onclick  = () => document.getElementById('pp-overlay').classList.remove('open');
-    document.getElementById('pp-add-btn').onclick = () => {
-        if (!ppSelectedSrc || !ppPendingProduct) return;
-        document.getElementById('pp-overlay').classList.remove('open');
-        pushFav(ppPendingProduct, ppPendingImages, ppSelectedSrc);
-        showToast('❤️ Added to favourites!');
-    };
+    function updatePpBtn() {
+        const n   = ppSelectedSrcs.size;
+        const btn = document.getElementById('pp-add-btn');
+        btn.disabled    = n === 0;
+        btn.textContent = n === 0
+            ? '❤️ Select photos to add'
+            : `❤️ Add ${n} Photo${n !== 1 ? 's' : ''} to Favourites`;
+    }
+
 
 
     // refresh every heart button on the page
