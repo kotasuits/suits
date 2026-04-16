@@ -95,15 +95,43 @@ document.addEventListener('DOMContentLoaded', () => {
     function updatePpBtn() {
         const n   = ppSelectedSrcs.size;
         const btn = document.getElementById('pp-add-btn');
+        if (!btn) return;
         btn.disabled    = n === 0;
         btn.textContent = n === 0
             ? '❤️ Select photos to add'
             : `❤️ Add ${n} Photo${n !== 1 ? 's' : ''} to Favourites`;
     }
 
+    // ── Picker button/overlay event listeners ──
+    (function wirePicker() {
+        const overlay = document.getElementById('pp-overlay');
+        const btnClose  = document.getElementById('pp-close');
+        const btnCancel = document.getElementById('pp-cancel');
+        const btnAdd    = document.getElementById('pp-add-btn');
+        if (!overlay) return; // HTML not loaded
 
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) overlay.classList.remove('open');
+        });
+        btnClose.onclick  = () => overlay.classList.remove('open');
+        btnCancel.onclick = () => overlay.classList.remove('open');
+        btnAdd.onclick    = () => {
+            if (ppSelectedSrcs.size === 0 || !ppPendingProduct) return;
+            overlay.classList.remove('open');
+            pushFav(ppPendingProduct, ppPendingImages, [...ppSelectedSrcs]);
+            showToast(`❤️ ${ppSelectedSrcs.size} photo${ppSelectedSrcs.size !== 1 ? 's' : ''} added to favourites!`);
+        };
+    })();
 
-    // refresh every heart button on the page
+    // ── Toast helper (uses #success-toast element in index.html) ──
+    function showToast(msg) {
+        const el = document.getElementById('success-toast');
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.add('show');
+        clearTimeout(el._timer);
+        el._timer = setTimeout(() => el.classList.remove('show'), 3000);
+    }
     function refreshHeartButtons() {
         document.querySelectorAll('.heart-btn').forEach(btn => {
             const id = btn.dataset.id;
