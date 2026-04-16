@@ -610,9 +610,10 @@ document.addEventListener('DOMContentLoaded', () => {
         card.className = `order-card status-${order.status}`;
         card.dataset.id = order.id;
 
+        let grandTotal = 0;
+
         const initials    = order.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
         const date        = new Date(order.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-        const total       = (order.designs||[]).reduce((s,d)=>s+Number(d.price||0),0);
         const sbMap       = { new:'sb-new', seen:'sb-seen', contacted:'sb-contacted', closed:'sb-closed' };
         const slMap       = { new:'🆕 New', seen:'👀 Seen', contacted:'📞 Contacted', closed:'✅ Closed' };
         const designsHtml = (order.designs||[]).map(d => {
@@ -622,7 +623,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         : [allImgs[0] || ''];
             selImgs = selImgs.filter(s => s); // remove empty
 
-            const selCount   = selImgs.length;
+            const selCount   = Math.max(1, selImgs.length);
+            const itemPrice  = Number(d.price||0);
+            const itemTotal  = selCount * itemPrice;
+            grandTotal += itemTotal;
+
             const gridClass = `n${Math.min(selCount, 4)}`;
 
             const picksHtml = selImgs.slice(0,4).map((s, i) => `
@@ -633,6 +638,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const selIdxArr = selImgs.map(s => allImgs.indexOf(s)).filter(i => i >= 0);
 
+            let priceText = `₹${itemPrice.toLocaleString('en-IN')}`;
+            if (selCount > 1) {
+                priceText = `₹${itemPrice} x ${selCount} = ₹${itemTotal.toLocaleString('en-IN')}`;
+            }
+
             return `<div class="design-chip"
                 data-imgs='${JSON.stringify(allImgs)}'
                 data-sel-idxs='${JSON.stringify(selIdxArr)}'
@@ -641,7 +651,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 data-price="${d.price}">
                 <div class="dc-picks-grid ${gridClass}">${picksHtml}</div>
                 <div class="dc-name">${d.title}</div>
-                <div class="dc-price">₹${Number(d.price).toLocaleString('en-IN')}/pc</div>
+                <div class="dc-price">${priceText}</div>
                 <div class="dc-zoom">
                     ${selCount > 1 ? `★ ${selCount} colors picked` : '★ 1 color picked'}
                 </div>
@@ -673,7 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="designs-grid">${designsHtml}</div>
                 <div class="order-meta">
                     <span>🆔 ${order.id}</span>
-                    <span>💰 Est. ₹${total.toLocaleString('en-IN')}</span>
+                    <span>💰 Est. ₹${grandTotal.toLocaleString('en-IN')}</span>
                     <span>📅 ${date}</span>
                 </div>
                 <div class="body-actions">
@@ -859,7 +869,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const rows = [['ID','Name','Phone','Designs','Total ₹','Status','Date']];
         orders.forEach(o => {
             const names = (o.designs||[]).map(d=>d.title).join(' | ');
-            const total = (o.designs||[]).reduce((s,d)=>s+Number(d.price||0),0);
+            const total = (o.designs||[]).reduce((s,d) => {
+                const selCount = Math.max(1, (d.selectedImages || []).length || (d.selectedImage ? 1 : 1));
+                return s + (Number(d.price||0) * selCount);
+            }, 0);
             rows.push([o.id, o.name, o.phone, names, total, o.status, new Date(o.createdAt).toLocaleString('en-IN')]);
         });
         const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
