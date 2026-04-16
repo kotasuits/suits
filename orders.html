@@ -706,7 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.querySelector('.chevron').classList.toggle('open');
         });
 
-        // ── Design chip → gallery (opens at first selected photo, all picks highlighted) ──
+        // ── Design chip → gallery (opens with ONLY selected photos) ──
         card.querySelectorAll('.design-chip').forEach(chip => {
             chip.onclick = e => {
                 e.stopPropagation();
@@ -714,11 +714,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 try { imgs    = JSON.parse(chip.dataset.imgs    || '[]'); } catch { imgs = []; }
                 try { selIdxs = JSON.parse(chip.dataset.selIdxs || '[0]'); } catch { selIdxs = [0]; }
                 if (!imgs.length) return;
+
+                // Only extract the photos that were actually picked
+                let pickedImgs = selIdxs.map(i => imgs[i]).filter(Boolean);
+                if (!pickedImgs.length) pickedImgs = [imgs[0] || ''];
+
+                // Since we filtered, all photos in the array are picks!
+                const newSelIdxs = pickedImgs.map((_, i) => i);
+
                 openGallery({
-                    images:      imgs,
-                    startIdx:    selIdxs[0] || 0,
-                    selectedIdx: selIdxs[0] || 0,
-                    selIdxs:     selIdxs,
+                    images:      pickedImgs,
+                    startIdx:    0,
+                    selectedIdx: 0,
+                    selIdxs:     newSelIdxs,
                     title:       chip.dataset.title,
                     category:    chip.dataset.cat,
                     price:       chip.dataset.price
