@@ -496,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (selCount > 1) return `• ${d.title} (${selCount} colors)\n  ₹${itemPrice.toLocaleString('en-IN')} x ${selCount} = ₹${(selCount * itemPrice).toLocaleString('en-IN')}/pc`;
                 return `• ${d.title} — ₹${itemPrice.toLocaleString('en-IN')}/pc`;
             }).join('\n\n');
-            return `Hi ${o.name}! Here is the pricing for your selected Kota Doria designs:\n\n${designs}\n\n*Estimated Order Total: ₹${totalEst.toLocaleString('en-IN')}*\n(Note: Wholesale MOQ is 30-50 pcs).\n\nInterested in placing an order? Reply to confirm! 🎀`; 
+            return `Hi ${o.name}! Here is the pricing for your selected Kota Doria designs:\n\n${designs}\n\n*Estimated Order Total: ₹${totalEst.toLocaleString('en-IN')}*\n(Note: Wholesale MOQ is 30-50 pcs per color).\n\nInterested in placing an order? Reply to confirm! 🎀`; 
         } },
         { label: '✅ Order Ready',     text: (o) => `Dear ${o.name}, your Kota Doria order is ready for dispatch! Kindly confirm your delivery address and preferred courier. We look forward to serving you again! 🛍️` },
         { label: '🎉 Follow Up',       text: (o) => `Hi ${o.name}! 👋 Just following up on your Kota Doria enquiry for ${o.designs?.length || 0} designs. Let us know if you have any questions — we're happy to help!` },
@@ -548,6 +548,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const o = orders.find(x => x.id === currentWaOrder.id);
         if (o && (o.status === 'new' || o.status === 'seen')) {
             o.status = 'contacted'; saveOrders(); render();
+            syncRemoteOrderUpdates('status', { id: o.id, status: 'contacted' });
         }
         closeWaModal();
         toast('💬 WhatsApp opened!', 'ok');
@@ -605,7 +606,12 @@ document.addEventListener('DOMContentLoaded', () => {
         list.forEach(o => container.appendChild(buildCard(o)));
 
         // Auto-mark new → seen
-        list.filter(o => o.status === 'new').forEach(o => { o.status = 'seen'; saveOrders(); });
+        const newlySeen = list.filter(o => o.status === 'new');
+        if (newlySeen.length > 0) {
+            newlySeen.forEach(o => o.status = 'seen');
+            saveOrders();
+            syncRemoteOrderUpdates('mark_seen', { ids: newlySeen.map(o => o.id) });
+        }
     }
 
     function updateStats() {
@@ -756,20 +762,32 @@ document.addEventListener('DOMContentLoaded', () => {
         card.querySelector('.status-sel').onchange = e => {
             e.stopPropagation();
             const o = orders.find(x => x.id === e.target.dataset.id);
-            if (o) { o.status = e.target.value; saveOrders(); updateStats(); card.className = `order-card status-${o.status}`; }
+            if (o) { 
+                o.status = e.target.value; 
+                saveOrders(); 
+                updateStats(); 
+                card.className = `order-card status-${o.status}`;
+                syncRemoteOrderUpdates('status', { id: o.id, status: o.status });
+            }
         };
 
         // ── Delete ──
         const delBtn = card.querySelector('.del-btn');
         if(delBtn) {
-            delBtn.onclick = e => {
+            delBtn.onclick = async e => {
                 e.preventDefault();
                 e.stopPropagation();
                 if (!confirm(`Delete enquiry from ${order.name}?`)) return;
+                
+                delBtn.disabled = true;
+                delBtn.textContent = 'Deleting...';
+                
+                await syncRemoteOrderUpdates('delete', { id: order.id });
+
                 orders = orders.filter(x => String(x.id) !== String(order.id));
                 saveOrders();
                 render();
-                toast('🗑 Enquiry deleted');
+                toast('🗑 Enquiry deleted', 'ok'); // Changed to specific confirm toast
             };
         }
 
@@ -908,6 +926,59 @@ document.addEventListener('DOMContentLoaded', () => {
         t.textContent = msg;
         document.getElementById('o-toast').appendChild(t);
         setTimeout(() => t.remove(), 3500);
+    // ─── Remote Sync Function ──────────────────────────────────────────
+    async function syncRemoteOrderUpdates(action, data) {
+        const mode    = localStorage.getItem('admin_mode');
+        const ghToken = localStorage.getItem('gh_token');
+        const ghRepo  = localStorage.getItem('gh_repo');
+
+        if (mode === 'github' && ghToken && ghRepo) {
+            try {
+                const url = `https://api.github.com/repos/${ghRepo}/contents/orders.json`;
+                const headers = { 'Authorization': `token ${ghToken}`, 'Accept': 'application/vnd.github.v3+json' };
+                const r = await fetch(url + '?t=' + Date.now(), { headers });
+                if (r.ok) {
+                    const d = await r.json();
+                    let content = JSON.parse(decodeURIComponent(escape(atob(d.content.replace(/\\s/g, '')))));
+                    
+                    if (action === 'delete') {
+                        content = content.filter(o => String(o.id) !== String(data.id));
+                    } else if (action === 'status') {
+                        const idx = content.findIndex(o => String(o.id) === String(data.id));
+                        if(idx !== -1) content[idx].status = data.status;
+                    } else if (action === 'mark_seen') {
+                        let changed = false;
+                        data.ids.forEach(id => {
+                            const idx = content.findIndex(o => String(o.id) === String(id));
+                            if (idx !== -1 && content[idx].status === 'new') {
+                                content[idx].status = 'seen';
+                                changed = true;
+                            }
+                        });
+                        if (!changed) return;
+                    }
+
+                    const body = {
+                        message: `Admin action: ${action}`,
+                        content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
+                        sha: d.sha
+                    };
+                    await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+                }
+            } catch(err) { console.error('GitHub sync error', err); }
+        } else if (mode === 'server') {
+            try {
+                if (action === 'delete') {
+                    await fetch(`api/orders/${data.id}`, { method: 'DELETE', headers: { 'Authorization': localStorage.getItem('admin_token') } });
+                } else if (action === 'status') {
+                    await fetch(`api/orders/${data.id}`, { method: 'PUT', headers: { 'Authorization': localStorage.getItem('admin_token'), 'Content-Type': 'application/json' }, body: JSON.stringify({ status: data.status }) });
+                } else if (action === 'mark_seen') {
+                    for(let id of data.ids) {
+                        await fetch(`api/orders/${id}`, { method: 'PUT', headers: { 'Authorization': localStorage.getItem('admin_token'), 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'seen' }) });
+                    }
+                }
+            } catch(err) { console.error('Server sync error', err); }
+        }
     }
 
     loadOrders();
